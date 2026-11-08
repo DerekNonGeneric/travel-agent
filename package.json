@@ -1,9 +1,10 @@
 {
   "name": "travel-agent",
   "version": "1.0.0",
-  "description": "",
+  "description": "TravelMate AI – Intelligent Travel Assistant",
   "main": "index.js",
   "scripts": {
+    "start": "tsx index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -20,7 +21,7 @@
   "type": "module",
   "dependencies": {
     "@ai-sdk/openai": "^4.0.103",
-    "ai": "^7.0.145",
+    "ai": "7.0.153",
     "dotenv": "^18.0.8",
     "zod": "^4.6.7"
   },
