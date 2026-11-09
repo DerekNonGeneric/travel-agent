@@ -2,8 +2,10 @@ import { openai } from '@ai-sdk/openai';
 import { ModelMessage, streamText } from 'ai';
 import 'dotenv/config';
 import * as readline from 'node:readline/promises';
-import { classifyIntent, TravelEntities } from './classifyIntent';
+import { classifyIntent, MODEL_ID } from './classifyIntent';
+import { fixedResponse } from './responses';
 import { greeting, travelAgentSystemPrompt } from './systemPrompt';
+import { mergeTripContext, TripContext } from './tripContext';
 
 const terminal = readline.createInterface({
   input: process.stdin,
@@ -13,7 +15,7 @@ const terminal = readline.createInterface({
 const messages: ModelMessage[] = [];
 
 // Trip details remembered across turns (conversational context).
-const tripContext: Partial<TravelEntities> = {};
+let tripContext: TripContext = {};
 
 const helpText = `
 TravelMate can help with:
@@ -27,22 +29,6 @@ TravelMate can help with:
 
 Commands: /help, /context, /exit
 `;
-
-const offTopicResponse =
-  "I'm sorry, but I specialize in travel assistance. I'd be happy to help " +
-  'you plan a trip, find flights, or explore destinations! Where would you like to go?';
-
-const unknownResponse =
-  "I'm not sure I understood. Could you clarify your travel question? " +
-  'I can help with flights, hotels, itineraries, budgets, and more.';
-
-function updateTripContext(entities: TravelEntities) {
-  for (const [key, value] of Object.entries(entities)) {
-    if (value !== null) {
-      (tripContext as Record<string, unknown>)[key] = value;
-    }
-  }
-}
 
 async function main() {
   console.log(`\nTravelMate: ${greeting}`);
@@ -77,27 +63,24 @@ async function main() {
 
       // NLP: intent recognition + named entity recognition
       const classification = await classifyIntent(text, history);
-      updateTripContext(classification.entities);
+      tripContext = mergeTripContext(tripContext, classification.entities);
 
       console.log('\n[NLP Intent]:', classification.intent);
+      console.log('[NLP Language]:', classification.language);
       console.log('[NLP Entities]:', JSON.stringify(classification.entities));
       console.log('[Trip context]:', JSON.stringify(tripContext));
 
       messages.push({ role: 'user', content: text });
 
-      let fixedResponse: string | null = null;
-      if (classification.intent === 'off_topic') fixedResponse = offTopicResponse;
-      if (classification.intent === 'unknown') fixedResponse = unknownResponse;
-      if (classification.intent === 'help') fixedResponse = helpText.trim();
-
-      if (fixedResponse !== null) {
-        console.log(`\nTravelMate: ${fixedResponse}\n`);
-        messages.push({ role: 'assistant', content: fixedResponse });
+      const fixed = fixedResponse(classification.intent, classification.language);
+      if (fixed !== null) {
+        console.log(`\nTravelMate: ${fixed}\n`);
+        messages.push({ role: 'assistant', content: fixed });
         continue;
       }
 
       const result = streamText({
-        model: openai('gpt-5.1'),
+        model: openai(MODEL_ID),
         system:
           travelAgentSystemPrompt +
           `
