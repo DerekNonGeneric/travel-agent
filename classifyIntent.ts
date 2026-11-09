@@ -3,8 +3,11 @@ import { generateText, Output } from 'ai';
 import { z } from 'zod';
 import { intents } from './intents';
 
+export const MODEL_ID = process.env.OPENAI_MODEL || 'gpt-5.1';
+
 const classificationSchema = z.object({
   intent: z.enum(intents),
+  language: z.enum(['en', 'es', 'other']),
   entities: z.object({
     origin: z.string().nullable(),
     destination: z.string().nullable(),
@@ -17,14 +20,16 @@ const classificationSchema = z.object({
 
 export type Classification = z.infer<typeof classificationSchema>;
 export type TravelEntities = Classification['entities'];
+export type Language = Classification['language'];
 
 export async function classifyIntent(
   userInput: string,
   history: string,
 ): Promise<Classification> {
   const { output } = await generateText({
-    model: openai('gpt-5.1'),
+    model: openai(MODEL_ID),
     output: Output.object({ schema: classificationSchema }),
+    providerOptions: { openai: { reasoningEffort: 'none' } },
     system: `
 You classify messages for a travel chatbot.
 
@@ -48,6 +53,9 @@ Use the conversation history to understand follow-ups (e.g. "are there
 cheaper options?" after a flight discussion is flight_search).
 Extract travel entities from the current message and from relevant,
 established conversation context.
+
+Set language to the language of the current user message
+("en" for English, "es" for Spanish, otherwise "other").
 
 Use null for information that is not provided.
 Do not invent dates, budgets, or destinations.
